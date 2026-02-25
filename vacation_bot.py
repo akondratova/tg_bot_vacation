@@ -62,7 +62,7 @@ async def scheduler():
     await bot.send_message(chat_id=CHAT_ID, text="✅ Бот работает")
     while True:
         await check_vacations()
-        await asyncio.sleep(86400)  # проверка раз в сутки
+        await asyncio.sleep(60)  # проверка раз в сутки
 
 
 def run_async_loop():
@@ -80,4 +80,5 @@ if __name__ == "__main__":
     threading.Thread(target=run_async_loop).start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
 
