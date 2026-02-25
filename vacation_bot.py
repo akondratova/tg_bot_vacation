@@ -1,51 +1,49 @@
 import os
 import json
 import asyncio
+import threading
 from datetime import datetime, timedelta
 
-import gspread
-from google.oauth2.service_account import Credentials
+from flask import Flask
 from telegram import Bot
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
+app = Flask(__name__)
 
-# ==== НАСТРОЙКИ ====
-TOKEN = os.environ["BOT_TOKEN"]
-CHAT_ID = int(os.environ["CHAT_ID"])
+TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = int(os.getenv("CHAT_ID"))
+SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 YEAR = 2026
 
-SPREADSHEET_ID = "1h8ftaZETqUBfVfRUyl_EGpiMQfyS32HmyG0ysgNKDaY"
-
 scope = [
-    "https://www.googleapis.com/auth/spreadsheets",
+    "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
+creds_dict = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+client = gspread.authorize(creds)
 
-# ==== ОСНОВНАЯ ПРОВЕРКА ====
+bot = Bot(token=TOKEN)
+
+
+def get_start_date(date_range):
+    if not date_range:
+        return None
+    start = date_range.split("-")[0]
+    day, month = start.split(".")
+    return datetime(YEAR, int(month), int(day)).date()
+
+
 async def check_vacations():
-    bot = Bot(token=TOKEN)
-
-    creds_dict = json.loads(os.environ["GOOGLE_CREDENTIALS"])
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-
-    client = gspread.authorize(creds)
     sheet = client.open_by_key(SPREADSHEET_ID).sheet1
     rows = sheet.get_all_records()
 
     today = datetime.now().date()
 
-    def get_start_date(date_range):
-        if not date_range:
-            return None
-        try:
-            start = str(date_range).split("-")[0]
-            day, month = start.strip().split(".")
-            return datetime(YEAR, int(month), int(day)).date()
-        except:
-            return None
-
     for row in rows:
-        name = row.get("ФИО")
+        name = row["ФИО"]
 
         for col in ["отпуск 1 часть дата", "отпуск 2 часть дата"]:
             start_date = get_start_date(row.get(col))
@@ -60,19 +58,24 @@ async def check_vacations():
                     )
 
 
-# ==== ПЛАНИРОВЩИК 24/7 ====
 async def scheduler():
     while True:
-        now = datetime.now()
+        await check_vacations()
+        await asyncio.sleep(86400)  # проверка раз в сутки
 
-        # Проверка каждый день в 09:00
-        if now.hour == 16 and now.minute == 30:
-            print("Проверка отпусков...")
-            await check_vacations()
-            await asyncio.sleep(60)  # чтобы не сработало 2 раза
 
-        await asyncio.sleep(30)
+def run_async_loop():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(scheduler())
+
+
+@app.route("/")
+def home():
+    return "Bot is running!"
 
 
 if __name__ == "__main__":
-    asyncio.run(scheduler())
+    threading.Thread(target=run_async_loop).start()
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
