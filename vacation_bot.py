@@ -49,7 +49,7 @@ async def check_vacations():
             start_date = get_start_date(row.get(col))
 
             if start_date:
-                notify_date = start_date - timedelta(days=5)
+                notify_date = start_date - timedelta(days=4)
 
                 if notify_date == today:
                     await bot.send_message(
