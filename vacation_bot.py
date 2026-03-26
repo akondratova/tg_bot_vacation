@@ -54,7 +54,7 @@ async def check_vacations():
                 if notify_date == today:
                     await bot.send_message(
                         chat_id=CHAT_ID,
-                        text=f"📌 Через 5 дней отпуск:\n{name} — с {start_date.strftime('%d.%m')}"
+                        text=f"📌 Через 4 дня отпуск:\n{name} — с {start_date.strftime('%d.%m')}"
                     )
 
 
